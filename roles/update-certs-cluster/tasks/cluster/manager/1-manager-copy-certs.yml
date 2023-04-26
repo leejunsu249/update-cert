@@ -1,0 +1,280 @@
+---
+##################### ansible key pass #############################
+- name: Create config directory
+  file: path=/etc/kubernetes/pki/conf state=directory owner={{ ansible_user }} group={{ ansible_group }}
+  register: pki_dir
+  ignore_errors: yes
+
+- name: Create pki etcd directory
+  file: path=/etc/kubernetes/pki/etcd state=directory owner={{ ansible_user }} group={{ ansible_group }}
+  register: pki_etcd_dir
+  ignore_errors: yes
+
+- name: chown dir
+  shell: >
+    chown -R {{ ansible_user }}:{{ ansible_group }} {{ item }}
+  with_items:
+    - "/etc/kubernetes"
+    - "{{ kube_addon_dir }}/host_pki"
+  ignore_errors: yes
+  when:
+    - ansible_user != "root"
+
+- name: Copy pki(scp)
+  shell: >
+    scp -P {{ ansible_ssh_port }} -r {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/* {{ ansible_user }}@{{ ansible_host }}:/etc/kubernetes/pki/
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - ansible_password_option != "yes"
+    - keyfile_option != "yes"
+  register: result
+  until: result.rc == 0
+  retries: 3
+  delay: 5
+
+- name: remove conf files
+  shell: >
+    rm -rf /etc/kubernetes/*.conf
+  when:
+    - ansible_password_option != "yes"
+    - keyfile_option != "yes"    
+
+- name: Copy pki(scp)
+  shell: >
+    scp -P {{ ansible_ssh_port }} -r {{ kube_addon_dir }}/host_conf/{{ cluster_name }}/* {{ ansible_user }}@{{ ansible_host }}:/etc/kubernetes/
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - ansible_password_option != "yes"
+    - keyfile_option != "yes"
+  register: result
+  until: result.rc == 0
+  retries: 3
+  delay: 5
+
+- name: Copy Certs (master2)
+  shell: >
+    scp -P {{ ansible_ssh_port }} {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/{{ item }}-master2.crt {{ ansible_user }}@{{ master2_ip }}:/etc/kubernetes/pki/etcd/{{ item }}.crt
+  with_items:
+    - peer
+    - server
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - ansible_password_option != "yes"
+    - keyfile_option != "yes"
+
+- name: Copy key (master2)
+  shell: >
+    scp -P {{ ansible_ssh_port }} {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/{{ item }}-master2.key {{ ansible_user }}@{{ master2_ip }}:/etc/kubernetes/pki/etcd/{{ item }}.key
+  with_items:
+    - peer
+    - server
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - ansible_password_option != "yes"
+    - keyfile_option != "yes"
+
+- name: Copy Certs (master3)
+  shell: >
+    scp -P {{ ansible_ssh_port }} {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/{{ item }}-master3.crt {{ ansible_user }}@{{ master3_ip }}:/etc/kubernetes/pki/etcd/{{ item }}.crt
+  with_items:
+    - peer
+    - server
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - ansible_password_option != "yes"
+    - keyfile_option != "yes"
+
+- name: Copy key (master3)
+  shell: >
+    scp -P {{ ansible_ssh_port }} {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/{{ item }}-master3.key {{ ansible_user }}@{{ master3_ip }}:/etc/kubernetes/pki/etcd/{{ item }}.key
+  with_items:
+    - peer
+    - server
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - ansible_password_option != "yes"
+    - keyfile_option != "yes"
+
+- name: Copy kubelet.conf (master2)
+  shell: >
+    scp -P {{ ansible_ssh_port }} {{ kube_addon_dir }}/host_conf/{{ cluster_name }}/kubelet-master2.conf {{ ansible_user }}@{{ master2_ip }}:/etc/kubernetes/kubelet.conf
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - ansible_password_option != "yes"
+    - keyfile_option != "yes"
+
+- name: Copy kubelet.conf (master3)
+  shell: >
+    scp -P {{ ansible_ssh_port }} {{ kube_addon_dir }}/host_conf/{{ cluster_name }}/kubelet-master3.conf {{ ansible_user }}@{{ master3_ip }}:/etc/kubernetes/kubelet.conf
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - ansible_password_option != "yes"
+    - keyfile_option != "yes"
+
+
+##################### ansible password ##############################
+- name: Copy pki(scp)
+  shell: >
+    sshpass -p {{ ansible_ssh_pass }} scp -P {{ ansible_ssh_port }} -o StrictHostKeyChecking=no -r {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/* {{ ansible_user }}@{{ ansible_host }}:/etc/kubernetes/pki/
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - ansible_password_option == "yes"
+  register: result
+  until: result.rc == 0
+  retries: 3
+  delay: 5
+
+- name: remove conf files
+  shell: >
+    rm -rf /etc/kubernetes/*.conf
+  when:
+    - ansible_password_option == "yes"    
+
+- name: Copy pki(scp)
+  shell: >
+    sshpass -p {{ ansible_ssh_pass }} scp -P {{ ansible_ssh_port }} -o StrictHostKeyChecking=no -r {{ kube_addon_dir }}/host_conf/{{ cluster_name }}/* {{ ansible_user }}@{{ ansible_host }}:/etc/kubernetes/
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - ansible_password_option == "yes"
+  register: result
+  until: result.rc == 0
+  retries: 3
+  delay: 5
+
+- name: Copy Certs (master2)
+  shell: >
+    sshpass -p {{ ansible_ssh_pass }} scp -P {{ ansible_ssh_port }} -o StrictHostKeyChecking=no {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/{{ item }}-master2.crt {{ ansible_user }}@{{ master2_ip }}:/etc/kubernetes/pki/etcd/{{ item }}.crt
+  with_items:
+    - peer
+    - server
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - ansible_password_option == "yes"
+
+- name: Copy key (master2)
+  shell: >
+    sshpass -p {{ ansible_ssh_pass }} scp -P {{ ansible_ssh_port }} -o StrictHostKeyChecking=no {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/{{ item }}-master2.key {{ ansible_user }}@{{ master2_ip }}:/etc/kubernetes/pki/etcd/{{ item }}.key
+  with_items:
+    - peer
+    - server
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - ansible_password_option == "yes"
+
+- name: Copy Certs (master3)
+  shell: >
+    sshpass -p {{ ansible_ssh_pass }} scp -P {{ ansible_ssh_port }} -o StrictHostKeyChecking=no {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/{{ item }}-master3.crt {{ ansible_user }}@{{ master3_ip }}:/etc/kubernetes/pki/etcd/{{ item }}.crt
+  with_items:
+    - peer
+    - server
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - ansible_password_option == "yes"
+
+- name: Copy key (master3)
+  shell: >
+    sshpass -p {{ ansible_ssh_pass }} scp -P {{ ansible_ssh_port }} -o StrictHostKeyChecking=no {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/{{ item }}-master3.key {{ ansible_user }}@{{ master3_ip }}:/etc/kubernetes/pki/etcd/{{ item }}.key
+  with_items:
+    - peer
+    - server
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - ansible_password_option == "yes"
+
+- name: Copy kubelet.conf (master2)
+  shell: >
+    sshpass -p {{ ansible_ssh_pass }} scp -P {{ ansible_ssh_port }} -o StrictHostKeyChecking=no {{ kube_addon_dir }}/host_conf/{{ cluster_name }}/kubelet-master2.conf {{ ansible_user }}@{{ master2_ip }}:/etc/kubernetes/kubelet.conf
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - ansible_password_option == "yes"
+
+- name: Copy kubelet.conf (master3)
+  shell: >
+    sshpass -p {{ ansible_ssh_pass }} scp -P {{ ansible_ssh_port }} -o StrictHostKeyChecking=no {{ kube_addon_dir }}/host_conf/{{ cluster_name }}/kubelet-master3.conf {{ ansible_user }}@{{ master3_ip }}:/etc/kubernetes/kubelet.conf
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - ansible_password_option == "yes"
+
+#############################################################################
+- name: Copy pki(scp)
+  shell: >
+    scp -P {{ ansible_ssh_port }} -i {{ ansible_ssh_private_key_file }} -r {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/* {{ ansible_user }}@{{ ansible_host }}:/etc/kubernetes/pki/
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - keyfile_option == "yes"
+  register: result
+  until: result.rc == 0
+  retries: 3
+  delay: 5
+
+- name: remove conf files
+  shell: >
+    rm -rf /etc/kubernetes/*.conf
+  when:
+    - keyfile_option == "yes"    
+
+- name: Copy pki(scp)
+  shell: >
+    scp -P {{ ansible_ssh_port }} -i {{ ansible_ssh_private_key_file }} -r {{ kube_addon_dir }}/host_conf/{{ cluster_name }}/* {{ ansible_user }}@{{ ansible_host }}:/etc/kubernetes/
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - keyfile_option == "yes"
+  register: result
+  until: result.rc == 0
+  retries: 3
+  delay: 5
+
+- name: Copy Certs (master2)
+  shell: >
+    scp -P {{ ansible_ssh_port }} -i {{ ansible_ssh_private_key_file }} {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/{{ item }}-master2.crt {{ ansible_user }}@{{ master2_ip }}:/etc/kubernetes/pki/etcd/{{ item }}.crt
+  with_items:
+    - peer
+    - server
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - keyfile_option == "yes"
+
+- name: Copy key (master2)
+  shell: >
+    scp -P {{ ansible_ssh_port }} -i {{ ansible_ssh_private_key_file }} {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/{{ item }}-master2.key {{ ansible_user }}@{{ master2_ip }}:/etc/kubernetes/pki/etcd/{{ item }}.key
+  with_items:
+    - peer
+    - server
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - keyfile_option == "yes"
+
+- name: Copy Certs (master3)
+  shell: >
+    scp -P {{ ansible_ssh_port }} -i {{ ansible_ssh_private_key_file }} {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/{{ item }}-master3.crt {{ ansible_user }}@{{ master3_ip }}:/etc/kubernetes/pki/etcd/{{ item }}.crt
+  with_items:
+    - peer
+    - server
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - keyfile_option == "yes"
+
+- name: Copy key (master3)
+  shell: >
+    scp -P {{ ansible_ssh_port }} -i {{ ansible_ssh_private_key_file }} {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/{{ item }}-master3.key {{ ansible_user }}@{{ master3_ip }}:/etc/kubernetes/pki/etcd/{{ item }}.key
+  with_items:
+    - peer
+    - server
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - keyfile_option == "yes"
+
+- name: Copy kubelet.conf (master2)
+  shell: >
+    scp -P {{ ansible_ssh_port }} -i {{ ansible_ssh_private_key_file }} {{ kube_addon_dir }}/host_conf/{{ cluster_name }}/kubelet-master2.conf {{ ansible_user }}@{{ master2_ip }}:/etc/kubernetes/kubelet.conf
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - keyfile_option == "yes"
+
+- name: Copy kubelet.conf (master3)
+  shell: >
+    scp -P {{ ansible_ssh_port }} -i {{ ansible_ssh_private_key_file }} {{ kube_addon_dir }}/host_conf/{{ cluster_name }}/kubelet-master3.conf {{ ansible_user }}@{{ master3_ip }}:/etc/kubernetes/kubelet.conf
+  delegate_to: "{{ groups['local'][0] }}"
+  when:
+    - keyfile_option == "yes"
+

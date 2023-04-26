@@ -1,0 +1,16 @@
+---
+- name: Update certs cluster(manager)
+  include_tasks: manager/main.yml
+  when:
+    - inventory_hostname in groups['manager']
+
+- name: Update certs cluster(member)
+  include_tasks: member/main.yml
+  when:
+    - inventory_hostname in groups['member']
+
+- name: restart all
+  shell: >
+    kubectl delete pods --all --all-namespaces
+  when:
+    - inventory_hostname in groups['master']

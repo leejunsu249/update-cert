@@ -1,0 +1,12 @@
+---
+- name: remove pki files
+  shell: >
+    rm -rf /etc/kubernetes/pki/*
+
+- name: remove conf files
+  shell: >
+    rm -rf /etc/kubernetes/*.conf
+
+- name: remove kubelet pki files
+  shell: >
+    rm -rf {{ kubelet_root_dir }}/pki/*

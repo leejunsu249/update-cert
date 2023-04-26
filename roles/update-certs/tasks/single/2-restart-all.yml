@@ -1,0 +1,4 @@
+---
+- name: restart all pods
+  shell: >
+    kubectl delete pods --all --all-namespaces

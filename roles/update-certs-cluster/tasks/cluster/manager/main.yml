@@ -1,0 +1,37 @@
+---
+- name: Remove certs master (manager)
+  include_tasks: 0-remove-certs.yml
+  when:
+    - inventory_hostname in groups['manager-master'] or inventory_hostname in groups['manager-master-cluster'] 
+
+- name: Update certs master (manager)
+  include_tasks: 0-manager-master-certs.yml
+  when:
+    - inventory_hostname in groups['manager-master']
+
+- name: Copy certs master (manager)
+  include_tasks: 1-manager-copy-certs.yml
+  when:
+    - inventory_hostname in groups['manager-master'] or inventory_hostname in groups['manager-master-cluster']
+
+- name: Restart static pods (manager)
+  include_tasks: 2-restart-static.yml
+  when:
+    - inventory_hostname in groups['manager-master'] or inventory_hostname in groups['manager-master-cluster']
+
+- name: Create token (manager)
+  include_tasks: 3-create-token.yml
+  when:
+    - inventory_hostname in groups['manager-master']
+
+- name: token setting (manager)
+  include_tasks: 4-token-setting.yml
+  when:
+    - inventory_hostname in groups['manager-master']
+
+- name: Join node (manager)
+  include_tasks: 5-manager-node.yml
+  when:
+    - inventory_hostname in groups['manager-minions'] or inventory_hostname in groups['manager-infra'] 
+
+

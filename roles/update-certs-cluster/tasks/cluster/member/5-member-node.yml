@@ -1,0 +1,27 @@
+---
+###################################################################
+# node
+###################################################################
+- name: remove pki files
+  shell: >
+    rm -rf /etc/kubernetes/pki/*
+
+- name: remove conf files
+  shell: >
+    rm -rf /etc/kubernetes/*.conf
+
+- name: remove kubelet pki files
+  shell: >
+    rm -rf {{ kubelet_root_dir }}/pki/*
+
+- name: Join nodes with member-master
+  shell: "kubeadm join --token {{ hostvars[groups['member-master'][0]].token.stdout }} {{ hostvars[groups['member-master'][0]].ip_port.stdout }} --ignore-preflight-errors=all --discovery-token-unsafe-skip-ca-verification"
+  register: kubeadm_join_command
+  when:
+    - container_option == "containerd"
+
+- name: Join nodes with member-master
+  shell: "kubeadm join --token {{ hostvars[groups['member-master'][0]].token.stdout }} {{ hostvars[groups['member-master'][0]].ip_port.stdout }} --ignore-preflight-errors=all --discovery-token-unsafe-skip-ca-verification --cri-socket /var/run/crio/crio.sock"
+  register: kubeadm_join_command  
+  when: 
+    - container_option == "cri-o"

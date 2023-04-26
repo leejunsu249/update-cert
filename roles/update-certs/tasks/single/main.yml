@@ -1,0 +1,25 @@
+---
+- name: Update certs master(manager)
+  include_tasks: 0-manager-master.yml
+  when:
+    - inventory_hostname in groups['manager-master']
+
+- name: Update certs node(manager)
+  include_tasks: 1-manager-node.yml
+  when:
+    - inventory_hostname in groups['manager-minions'] or inventory_hostname in groups['manager-infra'] 
+
+- name: Update certs master(member)
+  include_tasks: 0-member-master.yml
+  when:
+    - inventory_hostname in groups['member-master']
+
+- name: Update certs node(member)
+  include_tasks: 1-member-node.yml
+  when:
+    - inventory_hostname in groups['member-minions'] or inventory_hostname in groups['member-infra']
+
+- name: restart all
+  include_tasks: 2-restart-all.yml
+  when:
+    - inventory_hostname in groups['master']

@@ -1,0 +1,43 @@
+- name: Get the token id from the master initialization
+  shell: "echo `kubeadm token list | tail -n1 | awk '{print $1}'`"
+  register: new_token
+
+- name: set var fact token
+  set_fact:
+    token: "{{ new_token }}"   
+
+- name: print output of new_token
+  debug: msg="{{ token.stdout }}"
+
+- name: Get the IP and port from the master initialization
+  shell: "echo '{{ master_ip }}:{{ kube_apiserver_port }}'"
+  register: kubeadm_master_ip_port
+
+- name: set var fact
+  set_fact:
+    ip_port: "{{ kubeadm_master_ip_port }}"
+  when: kubeadm_master_ip_port.changed
+
+- name: print output of kubeadm_master_ip_port
+  debug: msg="{{ ip_port.stdout_lines }}"
+
+- name: Get notready node name
+  shell: >
+    kubectl get nodes | awk '{print $1}' | tail -n1
+  register: node_name
+
+- name: node wait_for(30s)
+  wait_for: timeout=30
+
+- name: Restart kubelet
+  shell: >
+    systemctl restart kubelet
+
+- name: notready node wait_for
+  shell: >
+    kubectl wait --for=condition=ready node/{{ node_name.stdout }}
+  register: result
+  until: result.rc == 1
+  retries: 100
+  delay: 5
+  ignore_errors: yes

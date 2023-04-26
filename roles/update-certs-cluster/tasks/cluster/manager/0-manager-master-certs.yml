@@ -1,0 +1,648 @@
+---
+##########################################################################
+# Delete Certs
+##########################################################################
+- name: Kubeadm init phase certs
+  shell: "kubeadm init phase certs all --config={{ kube_addon_dir }}/kubeadm-config.yaml"
+  register: kubeadm_init
+  ignore_errors: yes
+
+- name: Delete Certs
+  shell: >
+    rm -rf {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/{ca.crt,ca.key,sa.key,sa.pub,apiserver.crt,apiserver-etcd-client.key,apiserver-kubelet-client.crt,front-proxy-ca.crt,front-proxy-client.crt,front-proxy-client.key,front-proxy-ca.key,apiserver-kubelet-client.key,apiserver.key,apiserver-etcd-client.crt}
+  ignore_errors: yes
+
+- name: Delete etcd Certs
+  shell: >
+    rm -rf {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/{ca.crt,ca.key,healthcheck-client.crt,healthcheck-client.key,peer.crt,peer.key,server.crt,server.key}
+  ignore_errors: yes
+
+##########################################################################
+# Copy Cert config file
+##########################################################################
+- name: Create config directory
+  file: path={{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf state=directory owner={{ ansible_user }} group={{ ansible_group }}
+  delegate_to: "{{ groups['local'][0] }}"
+  ignore_errors: yes
+
+- name: Create pki etcd directory
+  file: path={{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd state=directory owner={{ ansible_user }} group={{ ansible_group }}
+  delegate_to: "{{ groups['local'][0] }}"
+  ignore_errors: yes
+
+- name: Create conf directory
+  file: path={{ kube_addon_dir }}/host_conf/{{ cluster_name }} state=directory owner={{ ansible_user }} group={{ ansible_group }}
+  delegate_to: "{{ groups['local'][0] }}"
+  ignore_errors: yes
+
+
+- name: Copy Config file
+  template:
+    src: "{{ item }}"
+    dest: "{{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/{{ item }}"
+  with_items:
+    - ca.conf
+    - etcd-ca.conf
+    - user-admin.conf
+    - user-controller-manager.conf
+    - user-kubelet.conf
+    - user-kubelet-master2.conf
+    - user-kubelet-master3.conf
+    - user-scheduler.conf
+    - apiserver.conf
+    - apiserver-etcd-client.conf
+    - apiserver-kubelet-client.conf
+    - front-proxy-ca.conf
+    - front-proxy-client.conf 
+    - healthcheck-client.conf
+    - peer.conf
+    - peer-master2.conf
+    - peer-master3.conf
+    - server.conf
+    - server-master2.conf
+    - server-master3.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+##########################################################################
+# Create Certs
+##########################################################################
+# ca
+- name: Create ca.key
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create ca.crt
+  shell: >
+    openssl req -x509 -new -nodes -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.key -days {{ certificates_duration }} -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.crt -extensions v3_ext -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/ca.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+# sa
+- name: Create sa.key
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/sa.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create sa.pub
+  shell: >
+    openssl rsa -in {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/sa.key -pubout -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/sa.pub
+  delegate_to: "{{ groups['local'][0] }}"
+
+# user
+- name: Create user-admin.key
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-admin.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create user-admin.csr
+  shell: >
+    openssl req -new -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-admin.key -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-admin.csr -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-admin.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create user-admin.crt
+  shell: >
+    openssl x509 -req -in {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-admin.csr -CA {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.crt -CAkey {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.key -CAcreateserial -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-admin.crt -days {{ certificates_duration }} -extensions v3_ext -extfile {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-admin.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create user-controller-manager.key
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-controller-manager.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create user-controller-manager.csr
+  shell: >
+    openssl req -new -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-controller-manager.key -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-controller-manager.csr -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-controller-manager.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create user-controller-manager.crt
+  shell: >
+    openssl x509 -req -in {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-controller-manager.csr -CA {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.crt -CAkey {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.key -CAcreateserial -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-controller-manager.crt -days {{ certificates_duration }} -extensions v3_ext -extfile {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-controller-manager.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create user-kubelet.key (master)
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create user-kubelet.csr (master)
+  shell: >
+    openssl req -new -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet.key -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet.csr -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create user-kubelet.crt (master)
+  shell: >
+    openssl x509 -req -in {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet.csr -CA {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.crt -CAkey {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.key -CAcreateserial -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet.crt -days {{ certificates_duration }} -extensions v3_ext -extfile {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create user-kubelet.key (master2)
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet-master2.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create user-kubelet.csr (master2)
+  shell: >
+    openssl req -new -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet-master2.key -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet-master2.csr -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet-master2.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create user-kubelet.crt (master2)
+  shell: >
+    openssl x509 -req -in {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet-master2.csr -CA {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.crt -CAkey {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.key -CAcreateserial -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet-master2.crt -days {{ certificates_duration }} -extensions v3_ext -extfile {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet-master2.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create user-kubelet.key (master3)
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet-master3.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create user-kubelet.csr (master3)
+  shell: >
+    openssl req -new -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet-master3.key -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet-master3.csr -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet-master3.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create user-kubelet.crt (master3)
+  shell: >
+    openssl x509 -req -in {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet-master3.csr -CA {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.crt -CAkey {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.key -CAcreateserial -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet-master3.crt -days {{ certificates_duration }} -extensions v3_ext -extfile {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet-master3.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create user-scheduler.key
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-scheduler.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create user-scheduler.csr
+  shell: >
+    openssl req -new -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-scheduler.key -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-scheduler.csr -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-scheduler.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create user-scheduler.crt
+  shell: >
+    openssl x509 -req -in {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-scheduler.csr -CA {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.crt -CAkey {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.key -CAcreateserial -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-scheduler.crt -days {{ certificates_duration }} -extensions v3_ext -extfile {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-scheduler.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+# etcd-ca
+- name: Create etcd/ca.key
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/ca.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create etcd/ca.crt
+  shell: >
+    openssl req -x509 -new -nodes -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/ca.key -days {{ certificates_duration }} -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/ca.crt -extensions v3_ext -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/etcd-ca.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+# apiserver
+- name: Create apiserver.key
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/apiserver.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create apiserver.csr
+  shell: >
+    openssl req -new -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/apiserver.key -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/apiserver.csr -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/apiserver.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create apiserver.crt
+  shell: >
+    openssl x509 -req -in {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/apiserver.csr -CA {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.crt -CAkey {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.key -CAcreateserial -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/apiserver.crt -days {{ certificates_duration }} -extensions v3_ext -extfile {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/apiserver.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+# apiserver-etcd-client
+- name: Create apiserver-etcd-client.key
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/apiserver-etcd-client.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create apiserver-etcd-client.csr
+  shell: >
+    openssl req -new -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/apiserver-etcd-client.key -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/apiserver-etcd-client.csr -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/apiserver-etcd-client.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create apiserver-etcd-client.crt
+  shell: >
+    openssl x509 -req -in {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/apiserver-etcd-client.csr -CA {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/ca.crt -CAkey {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/ca.key -CAcreateserial -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/apiserver-etcd-client.crt -days {{ certificates_duration }} -extensions v3_ext -extfile {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/apiserver-etcd-client.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+# apiserver-kubelet-client
+- name: Create apiserver-kubelet-client.key
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/apiserver-kubelet-client.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create apiserver-kubelet-client.csr
+  shell: >
+    openssl req -new -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/apiserver-kubelet-client.key -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/apiserver-kubelet-client.csr -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/apiserver-kubelet-client.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create apiserver-kubelet-client.crt
+  shell: >
+    openssl x509 -req -in {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/apiserver-kubelet-client.csr -CA {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.crt -CAkey {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.key -CAcreateserial -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/apiserver-kubelet-client.crt -days {{ certificates_duration }} -extensions v3_ext -extfile {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/apiserver-kubelet-client.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+# front-proxy-ca
+- name: Create front-proxy-ca.key
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/front-proxy-ca.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create front-proxy-ca.crt
+  shell: >
+    openssl req -x509 -new -nodes -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/front-proxy-ca.key -days {{ certificates_duration }} -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/front-proxy-ca.crt -extensions v3_ext -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/front-proxy-ca.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+# front-proxy-client
+- name: Create front-proxy-client.key
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/front-proxy-client.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create front-proxy-client.csr
+  shell: >
+    openssl req -new -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/front-proxy-client.key -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/front-proxy-client.csr -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/front-proxy-client.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create front-proxy-client.crt
+  shell: >
+    openssl x509 -req -in {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/front-proxy-client.csr -CA {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/front-proxy-ca.crt -CAkey {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/front-proxy-ca.key -CAcreateserial -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/front-proxy-client.crt -days {{ certificates_duration }} -extensions v3_ext -extfile {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/front-proxy-client.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+# etcd/healthcheck-client
+- name: Create etcd/healthcheck-client.key
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/healthcheck-client.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create etcd/healthcheck-client.csr
+  shell: >
+    openssl req -new -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/healthcheck-client.key -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/healthcheck-client.csr -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/healthcheck-client.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create etcd/healthcheck-client.crt
+  shell: >
+    openssl x509 -req -in {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/healthcheck-client.csr -CA {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/ca.crt -CAkey {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/ca.key -CAcreateserial -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/healthcheck-client.crt -days {{ certificates_duration }} -extensions v3_ext -extfile {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/front-proxy-client.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+# etcd/peer
+- name: Create etcd/peer.key
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/peer.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create etcd/peer.csr
+  shell: >
+    openssl req -new -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/peer.key -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/peer.csr -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/peer.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create etcd/peer.crt
+  shell: >
+    openssl x509 -req -in {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/peer.csr -CA {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/ca.crt -CAkey {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/ca.key -CAcreateserial -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/peer.crt -days {{ certificates_duration }} -extensions v3_ext -extfile {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/peer.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+# etcd/peer-master2
+- name: Create etcd/peer.key (master2)
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/peer-master2.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create etcd/peer.csr (master2)
+  shell: >
+    openssl req -new -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/peer-master2.key -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/peer-master2.csr -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/peer-master2.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create etcd/peer.crt (master2)
+  shell: >
+    openssl x509 -req -in {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/peer-master2.csr -CA {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/ca.crt -CAkey {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/ca.key -CAcreateserial -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/peer-master2.crt -days {{ certificates_duration }} -extensions v3_ext -extfile {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/peer-master2.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+# etcd/peer-master3
+- name: Create etcd/peer.key (master3)
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/peer-master3.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create etcd/peer.csr (master3)
+  shell: >
+    openssl req -new -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/peer-master3.key -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/peer-master3.csr -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/peer-master3.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create etcd/peer.crt (master3)
+  shell: >
+    openssl x509 -req -in {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/peer-master3.csr -CA {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/ca.crt -CAkey {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/ca.key -CAcreateserial -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/peer-master3.crt -days {{ certificates_duration }} -extensions v3_ext -extfile {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/peer-master3.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+# etcd/server
+- name: Create etcd/server.key
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/server.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create etcd/server.csr
+  shell: >
+    openssl req -new -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/server.key -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/server.csr -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/server.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create etcd/server.crt
+  shell: >
+    openssl x509 -req -in {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/server.csr -CA {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/ca.crt -CAkey {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/ca.key -CAcreateserial -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/server.crt -days {{ certificates_duration }} -extensions v3_ext -extfile {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/server.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+# etcd/server-master2
+- name: Create etcd/server.key (master2)
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/server-master2.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create etcd/server.csr (master2)
+  shell: >
+    openssl req -new -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/server-master2.key -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/server-master2.csr -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/server-master2.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create etcd/server.crt (master2)
+  shell: >
+    openssl x509 -req -in {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/server-master2.csr -CA {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/ca.crt -CAkey {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/ca.key -CAcreateserial -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/server-master2.crt -days {{ certificates_duration }} -extensions v3_ext -extfile {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/server-master2.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+# etcd/server-master3
+- name: Create etcd/server.key (master3)
+  shell: >
+    openssl genrsa -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/server-master3.key 2048
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create etcd/server.csr (master3)
+  shell: >
+    openssl req -new -key {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/server-master3.key -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/server-master3.csr -config {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/server-master3.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Create etcd/server.crt (master3)
+  shell: >
+    openssl x509 -req -in {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/server-master3.csr -CA {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/ca.crt -CAkey {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/etcd/ca.key -CAcreateserial -out {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/server-master3.crt -days {{ certificates_duration }} -extensions v3_ext -extfile {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/server-master3.conf
+  delegate_to: "{{ groups['local'][0] }}"
+
+##########################################################################
+# Create kubeconfig
+##########################################################################\
+# Base64 ca.crt
+- name: Get ca.crt
+  shell: >
+    cat {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/ca.crt
+  register: ca_crt
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Base64 ca.crt
+  shell: >
+    echo {{ ca_crt.stdout | b64encode }}
+  register: base64_ca_crt
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: set var fact
+  set_fact:
+    base_ca_crt: "{{ base64_ca_crt }}"
+  delegate_to: "{{ groups['local'][0] }}"
+
+# Base64 user-admin.crt
+- name: Get user-admin.crt
+  shell: >
+    cat {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-admin.crt
+  register: user_admin_crt
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Base64 user-admin.crt
+  shell: >
+    echo {{ user_admin_crt.stdout | b64encode }}
+  register: base64_user_admin_crt
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: set var fact
+  set_fact:
+    base_admin_crt: "{{ base64_user_admin_crt }}"
+  delegate_to: "{{ groups['local'][0] }}"
+
+# Base64 user-admin.key
+- name: Get user-admin.key
+  shell: >
+    cat {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-admin.key
+  register: user_admin_key
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Base64 user-admin.key
+  shell: >
+    echo {{ user_admin_key.stdout | b64encode }}
+  register: base64_user_admin_key
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: set var fact
+  set_fact:
+    base_admin_key: "{{ base64_user_admin_key }}"
+  delegate_to: "{{ groups['local'][0] }}"
+
+# Base64 user-controller-manager.crt
+- name: Get user-controller-manager.crt
+  shell: >
+    cat {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-controller-manager.crt
+  register: user_controller_manager_crt
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Base64 user-controller-manager.crt
+  shell: >
+    echo {{ user_controller_manager_crt.stdout | b64encode }}
+  register: base64_user_controller_manager_crt
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: set var fact
+  set_fact:
+    base_controller_manager_crt: "{{ base64_user_controller_manager_crt }}"
+  delegate_to: "{{ groups['local'][0] }}"
+
+# Base64 user-controller-manager.key
+- name: Get user-controller-manager.key
+  shell: >
+    cat {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-controller-manager.key
+  register: user_controller_manager_key
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Base64 user-controller-manager.key
+  shell: >
+    echo {{ user_controller_manager_key.stdout | b64encode }}
+  register: base64_user_controller_manager_key
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: set var fact
+  set_fact:
+    base_controller_manager_key: "{{ base64_user_controller_manager_key }}"
+  delegate_to: "{{ groups['local'][0] }}"
+
+# Base64 user-kubelet.crt
+- name: Get user-kubelet.crt
+  shell: >
+    cat {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet.crt
+  register: user_kubelet_crt
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Base64 user-kubelet.crt
+  shell: >
+    echo {{ user_kubelet_crt.stdout | b64encode }}
+  register: base64_user_kubelet_crt
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: set var fact
+  set_fact:
+    base_kubelet_crt: "{{ base64_user_kubelet_crt }}"
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Get user-kubelet.crt (master2)
+  shell: >
+    cat {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet-master2.crt
+  register: user_kubelet_crt_master2
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Base64 user-kubelet-master2.crt
+  shell: >
+    echo {{ user_kubelet_crt_master2.stdout | b64encode }}
+  register: base64_user_kubelet_crt_master2
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: set var fact
+  set_fact:
+    base_kubelet_crt_master2: "{{ base64_user_kubelet_crt_master2 }}"
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Get user-kubelet-master3.crt (master3)
+  shell: >
+    cat {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet-master3.crt
+  register: user_kubelet_crt_master3
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Base64 user-kubelet-master3.crt
+  shell: >
+    echo {{ user_kubelet_crt_master3.stdout | b64encode }}
+  register: base64_user_kubelet_crt_master3
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: set var fact
+  set_fact:
+    base_kubelet_crt_master3: "{{ base64_user_kubelet_crt_master3 }}"
+  delegate_to: "{{ groups['local'][0] }}"
+
+# Base64 user-kubelet.key
+- name: Get user-kubelet.key
+  shell: >
+    cat {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet.key
+  register: user_kubelet_key
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Base64 user-kubelet.key
+  shell: >
+    echo {{ user_kubelet_key.stdout | b64encode }}
+  register: base64_user_kubelet_key
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: set var fact
+  set_fact:
+    base_kubelet_key: "{{ base64_user_kubelet_key }}"
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Get user-kubelet.key
+  shell: >
+    cat {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet-master2.key
+  register: user_kubelet_key_master2
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Base64 user-kubelet-master2.key
+  shell: >
+    echo {{ user_kubelet_key_master2.stdout | b64encode }}
+  register: base64_user_kubelet_key_master2
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: set var fact
+  set_fact:
+    base_kubelet_key_master2: "{{ base64_user_kubelet_key_master2 }}"
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Get user-kubelet.key
+  shell: >
+    cat {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-kubelet-master3.key
+  register: user_kubelet_key_master3
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Base64 user-kubelet-master3.key
+  shell: >
+    echo {{ user_kubelet_key_master3.stdout | b64encode }}
+  register: base64_user_kubelet_key_master3
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: set var fact
+  set_fact:
+    base_kubelet_key_master3: "{{ base64_user_kubelet_key_master3 }}"
+  delegate_to: "{{ groups['local'][0] }}"
+
+# Base64 user-scheduler.crt
+- name: Get user-scheduler.crt
+  shell: >
+    cat {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-scheduler.crt
+  register: user_scheduler_crt
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Base64 user-scheduler.crt
+  shell: >
+    echo {{ user_scheduler_crt.stdout | b64encode }}
+  register: base64_user_scheduler_crt
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: set var fact
+  set_fact:
+    base_scheduler_crt: "{{ base64_user_scheduler_crt }}"
+  delegate_to: "{{ groups['local'][0] }}"
+
+# Base64 user-scheduler.key
+- name: Get user-scheduler.key
+  shell: >
+    cat {{ kube_addon_dir }}/host_pki/{{ cluster_name }}_pki/conf/user-scheduler.key
+  register: user_scheduler_key
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Base64 user-scheduler.key
+  shell: >
+    echo {{ user_scheduler_key.stdout | b64encode }}
+  register: base64_user_scheduler_key
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: set var fact
+  set_fact:
+    base_scheduler_key: "{{ base64_user_scheduler_key }}"
+  delegate_to: "{{ groups['local'][0] }}"
+
+# Copy Template kubeconfig
+- name: Copy admin.conf
+  template:
+    src: admin.conf
+    dest: "{{ kube_addon_dir }}/host_conf/{{ cluster_name }}/admin.conf"
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Copy controller-manager.conf
+  template:
+    src: controller-manager.conf
+    dest: "{{ kube_addon_dir }}/host_conf/{{ cluster_name }}/controller-manager.conf"
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Copy kubelet.conf
+  template:
+    src: kubelet.conf
+    dest: "{{ kube_addon_dir }}/host_conf/{{ cluster_name }}/kubelet.conf"
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Copy kubelet.conf (master2)
+  template:
+    src: kubelet-master2.conf
+    dest: "{{ kube_addon_dir }}/host_conf/{{ cluster_name }}/kubelet-master2.conf"
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Copy kubelet.conf (master3)
+  template:
+    src: kubelet-master3.conf
+    dest: "{{ kube_addon_dir }}/host_conf/{{ cluster_name }}/kubelet-master3.conf"
+  delegate_to: "{{ groups['local'][0] }}"
+
+- name: Copy scheduler.conf
+  template:
+    src: scheduler.conf
+    dest: "{{ kube_addon_dir }}/host_conf/{{ cluster_name }}/scheduler.conf"
+  delegate_to: "{{ groups['local'][0] }}"

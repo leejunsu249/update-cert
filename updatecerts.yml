@@ -1,0 +1,44 @@
+---
+- name: node check(300s)
+  hosts: cluster
+
+  gather_facts: false
+
+  remote_user: "{{ ansible_user }}"
+  become: yes
+  become_user: root
+  become_method: sudo
+
+  pre_tasks:
+  - name: wait connection
+    wait_for_connection:
+      delay: 0
+      timeout: 300
+    connection: local
+
+- name: Update certs all
+  hosts: cluster
+  gather_facts: false
+
+  become: yes
+  become_user: root
+  become_method: sudo  
+
+  roles:
+    - role: update-certs
+      when:
+        - master_mode == "no" or ( master_mode == "yes" and single_option == "yes" )
+
+- name: Update certs all (cluster)
+  hosts: cluster
+  gather_facts: false
+
+  become: yes
+  become_user: root
+  become_method: sudo  
+
+  roles:
+    - role: update-certs-cluster
+      when:
+        - master_mode == "yes"
+        - single_option == "no"        

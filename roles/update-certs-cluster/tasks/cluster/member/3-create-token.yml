@@ -1,0 +1,15 @@
+- name: Get before token id
+  shell: "echo `kubeadm token list | tail -n1 | awk '{print $1}'`"
+  register: before_token
+
+- name: print output of before_token
+  debug: msg="{{ before_token.stdout }}"
+
+- name: Delete token id
+  shell: >
+    kubeadm token delete {{ before_token.stdout }}
+  ignore_errors: yes
+
+- name: Create new token    
+  shell: >
+    kubeadm init phase bootstrap-token --config {{ kube_addon_dir }}/kubeadm-config.yaml

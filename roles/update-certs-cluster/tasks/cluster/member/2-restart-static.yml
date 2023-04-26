@@ -1,0 +1,104 @@
+---
+- name: restart static pods
+  shell: "{{ item }}"
+  with_items:
+    - kill -s SIGHUP $(pidof kube-apiserver)
+    - kill -s SIGHUP $(pidof kube-controller-manager)
+    - kill -s SIGHUP $(pidof kube-scheduler)
+    - kill -s SIGHUP $(pidof etcd)
+  ignore_errors: yes
+
+- name: wait_for keepalived, haproxy
+  wait_for:
+    host: "{{ keep_vip }}"
+    port: "{{ haproxy_port }}"
+  register: result
+  until: result.elapsed == 0
+  retries: 30
+  delay: 5
+  run_once: true
+
+- name: Reload changing kubelet
+  command: systemctl daemon-reload
+
+- name: Start and enable services
+  service:
+    name: "{{ item }}"
+    state: restarted
+    enabled: yes
+  with_items:
+    - kubelet
+    - containerd
+  when:
+    - container_option == "containerd"
+
+- name: Start and enable services
+  service:
+    name: "{{ item }}"
+    state: restarted
+    enabled: yes
+  with_items:
+    - kubelet
+    - crio
+  when:
+    - container_option == "cri-o"
+
+- name: Replace kubeconfig
+  shell: >
+    yes | cp -rf /etc/kubernetes/admin.conf /root/.kube/config
+
+- name: kube-apiserver wait_for
+  shell: >
+    kubectl wait --for=condition=ready pod/kube-apiserver-{{ item }} -n kube-system
+  register: result
+  until: result.rc == 0
+  retries: 10
+  delay: 5
+  with_items:
+    - "{{ master_host_name }}"
+    - "{{ master2_hostname }}"
+    - "{{ master3_hostname }}"
+  when:
+    - inventory_hostname in groups['member-master']
+
+- name: etcd wait_for
+  shell: >
+    kubectl wait --for=condition=ready pod/etcd-{{ item }} -n kube-system
+  register: result
+  until: result.rc == 0
+  retries: 10
+  delay: 5
+  with_items:
+    - "{{ master_host_name }}"
+    - "{{ master2_hostname }}"
+    - "{{ master3_hostname }}"
+  when:
+    - inventory_hostname in groups['member-master']
+
+- name: kube-controller-manager wait_for
+  shell: >
+    kubectl wait --for=condition=ready pod/kube-controller-manager-{{ item }} -n kube-system
+  register: result
+  until: result.rc == 0
+  retries: 10
+  delay: 5
+  with_items:
+    - "{{ master_host_name }}"
+    - "{{ master2_hostname }}"
+    - "{{ master3_hostname }}"
+  when:
+    - inventory_hostname in groups['member-master']    
+
+- name:  kube-scheduler wait_for
+  shell: >
+    kubectl wait --for=condition=ready pod/kube-scheduler-{{ item }} -n kube-system
+  register: result
+  until: result.rc == 0
+  retries: 10
+  delay: 5
+  with_items:
+    - "{{ master_host_name }}"
+    - "{{ master2_hostname }}"
+    - "{{ master3_hostname }}"
+  when:
+    - inventory_hostname in groups['member-master']   
